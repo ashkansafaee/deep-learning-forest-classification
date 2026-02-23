@@ -1,60 +1,77 @@
-# Deep Learning for Forest Cover Type Classification
+# Deep Learning for Classification
 
-A deep neural network trained to classify seven types of forest cover from cartographic features, achieving 94.07% test accuracy on a dataset of 581,012 samples. Built as part of advanced studies in Mathematical Statistics and Machine Learning at Stockholm University.
+Two end-to-end deep learning projects tackling different data modalities, architectures, and core challenges — built as part of advanced studies in Mathematical Statistics and Machine Learning at Stockholm University.
 
-## Problem
+| Project | Data | Architecture | Challenge | Result |
+|---------|------|-------------|-----------|--------|
+| Forest Cover Classification | Tabular (581K samples) | 12-layer MLP | Class imbalance | 94.07% accuracy |
+| CIFAR-10 Image Classification | Images (60K samples) | CNN | Overfitting | 81% accuracy |
 
-The UCI Forest Covertype dataset presents two compounding challenges: scale (581,012 samples, 54 features) and severe class imbalance — the two dominant cover types account for over 85% of observations, while the rarest class represents less than 4%. A naive model simply predicts the majority class and looks deceptively accurate.
+---
 
-The goal was to build a model that performs well *across all seven classes* — including the rare ones.
+## Project 1 — Forest Cover Type Classification (MLP)
 
-## Approach
+### Problem
+Classify seven types of forest cover from 54 cartographic features across 581,012 samples. The core challenge: two dominant classes account for over 85% of observations, making naive models deceptively accurate while failing on rare classes.
 
-**Preprocessing**
-- 80/10/10 train/validation/test split applied *before* standardisation to prevent data leakage
-- Z-score standardisation fitted exclusively on training data, then applied to validation and test sets
-- Random oversampling of minority classes to full parity with the majority class, following Buda et al. (2018) — who demonstrate that oversampling is the dominant strategy for addressing class imbalance in deep learning
+### Approach
+- 80/10/10 train/validation/test split applied before standardisation to prevent data leakage
+- Z-score standardisation fitted on training data only
+- Random oversampling of minority classes to full parity with the majority class (Buda et al., 2018)
+- 12-layer barrel-shaped MLP: expands from 54 inputs via doubling protocol (54→80→160→320→640→1280) then compresses symmetrically to 7 outputs
+- ReLU activations, Softmax output, Adam optimizer (lr=1e-4, momentum=0.9)
+- Critical finding: batch size 512 was essential for stable convergence — sizes of 16 and 32 caused severe gradient variance on this scale of data
 
-**Architecture**
-A 12-layer barrel-shaped MLP implemented in Keras:
-- Starts at 54 input features, expands via a doubling protocol (54 → 80 → 160 → 320 → 640 → 1280) to capture complex non-linear representations
-- Compresses symmetrically back down (1280 → 640 → 320 → 160 → 80 → 40 → 20) before the output layer
-- ReLU activations throughout hidden layers; Softmax output for 7-class probability distribution
-- Adam optimizer (lr=1e-4, momentum=0.9); Sparse Categorical Crossentropy loss
+### Results
+- **Test accuracy: 94.07%**
+- **Class 7 accuracy: 87%** (representing <4% of original data)
+- Stable learning curves with no significant overfitting
 
-**Training**
-- 500 epochs, batch size 512
-- Batch size was a critical finding: sizes of 16 and 32 caused severe gradient variance and loss spikes on this large dataset. Batch 512 acted as a natural noise filter, producing stable, smooth convergence
-- No significant overfitting observed — validation loss tracks training loss throughout
+---
 
-## Results
+## Project 2 — CIFAR-10 Image Classification (CNN)
 
-| Metric | Value |
-|--------|-------|
-| Test Accuracy | **94.07%** |
-| Class 7 Accuracy (rarest class, <4% of data) | **87%** |
+### Problem
+Classify 60,000 colour images (32×32 pixels) across 10 classes. The core challenge here is the opposite of Project 1: the dataset is balanced, but small images and a relatively shallow network make overfitting the primary enemy.
 
-The confusion matrix confirms strong performance across all seven classes — including the minority classes that represent the real challenge in this dataset.
+### Approach
+A systematic progression of architectures, each addressing the limitations of the previous:
 
-## Key Findings
+**Baseline CNN (ReLU vs tanh comparison)**
+- 3-layer Conv2D architecture with MaxPooling
+- ReLU achieved ~68% accuracy; tanh achieved ~63%
+- tanh underperformed due to vanishing gradients and computational overhead — gradients approach zero for large inputs, halting learning in deeper layers
 
-- Oversampling combined with deep architecture effectively neutralises class imbalance without causing overfitting on duplicated samples
-- Batch size matters more than learning rate tuning at this data scale — instability from small batches cannot be resolved by momentum or rate adjustments alone
-- The barrel architecture (expand then compress) outperformed a shallower 4-layer baseline with a noticeable reduction in generalisation gap
+**Adding Batch Normalisation**
+- BN sandwiched between Conv2D (with `use_bias=False`) and activation, following Chollet (2021)
+- Stabilised training and improved accuracy to ~69%
+- However, validation loss failed to converge — clear overfitting signal
+
+**Adding Data Augmentation**
+- Random horizontal flips and rotations applied to training images
+- Expanded effective dataset size without collecting new data
+- Substantially closed the train/validation gap
+
+**Full Pipeline (BN + Augmentation + Dropout)**
+- Combining all three regularisation strategies pushed accuracy to **~81%**
+- Clean, converging learning curves with no overfitting
+
+### Key Finding
+Batch normalisation alone stabilises optimisation but does not prevent overfitting. Data augmentation addresses the root cause. Dropout adds a final layer of regularisation. Each technique solves a distinct problem — the combination is what matters.
+
+---
 
 ## Stack
 
-Python · Keras (TensorFlow) · NumPy · Pandas · Scikit-learn · Matplotlib · Seaborn · ucimlrepo
-
-## Data
-
-UCI Forest Covertype dataset — 581,012 samples, 54 cartographic features, 7 cover type classes.
-Source: `ucimlrepo` (id=31) / [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/31/covertype)
+Python · TensorFlow · Keras · NumPy · Pandas · Matplotlib · Seaborn · Scikit-learn · ucimlrepo
 
 ## References
 
 - Buda, M., Maki, A., & Mazurowski, M. A. (2018). *A systematic study of the class imbalance problem in convolutional neural networks.* Neural Networks, 106, 249–259.
 - Chollet, F. (2021). *Deep Learning with Python* (2nd ed.). Manning Publications.
+- Zhang, A. et al. (2023). *Dive into Deep Learning.* Available at d2l.ai
+- Ioffe, S. & Szegedy, C. (2015). *Batch Normalization: Accelerating Deep Network Training.*
+- Santurkar, S. et al. (2018). *How Does Batch Normalization Help Optimization?*
 
 ---
 
